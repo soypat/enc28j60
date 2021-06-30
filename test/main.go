@@ -4,7 +4,7 @@ import (
 	"machine"
 	"unsafe"
 
-	"net"
+	"github.com/soypat/net"
 
 	"github.com/soypat/enc28j60"
 	swtch "github.com/soypat/ether-swtch"
@@ -28,6 +28,7 @@ CS: PB0 == D53
 // var spiCS = machine.D10 // on Arduino Uno
 
 func main() {
+	println("start")
 	// SPI Chip select pin. Can be any Digital pin
 	var spiCS = machine.D53
 	// Inline declarations so not used as RAM
@@ -40,13 +41,31 @@ func main() {
 	machine.SPI0.Configure(machine.SPIConfig{Frequency: 8e6})
 
 	e := enc28j60.New(spiCS, machine.SPI0)
-
+	enc28j60.SDB = true
 	err := e.Init(MAC)
 	if err != nil {
 		println(err.Error())
 	}
+	if e == nil { // WITHOUT THIS NIL CHECK THE PROGRAM GC's e??
+		panic("nil device")
+	}
+	swtch.SDB = true
 	c := swtch.NewTCPConn(e, nil, MAC)
+	err = c.Decode()
+	if err != nil {
+		println(err.Error())
+	}
+	println(c.ARPv4.String())
+	err = c.SendResponse()
+	if err != nil {
+		println(err.Error())
+	}
 
+	err = c.Decode()
+	if err != nil {
+		println(err.Error())
+	}
+	println(c.TCP.String())
 }
 
 func codeFromErrorUnsafeArduino(err error) uint8 {

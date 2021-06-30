@@ -4,7 +4,7 @@ import (
 	"machine"
 	"runtime/interrupt"
 
-	"net"
+	"github.com/soypat/net"
 
 	"time"
 
@@ -19,7 +19,8 @@ type Dev struct {
 	// Chip select pin
 	CSB machine.Pin
 	// interrupt state
-	is   interrupt.State
+	is interrupt.State
+	// Bank saves last memory bank accessed by read/write ops.
 	Bank uint8
 	// Houses ERDPTL register data pointing to next packet position in buffer.
 	nextPacketPtr uint16
@@ -29,7 +30,6 @@ type Dev struct {
 	dummy [6]byte
 	// mac address
 	macaddr net.HardwareAddr
-
 	// SPI bus (requires chip select to be usable).
 	bus drivers.SPI
 }

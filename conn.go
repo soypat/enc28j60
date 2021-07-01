@@ -2,6 +2,7 @@ package enc28j60
 
 import (
 	"io"
+	"time"
 
 	swtch "github.com/soypat/ether-swtch"
 )
@@ -15,20 +16,21 @@ type Packet struct {
 func (d *Dev) NextPacket() (swtch.Reader, error) {
 	dbp("NextPacket")
 	var err error
-	p := &Packet{ic: d}
 	for d.read(EPKTCNT) == 0 { // loop until a packet is received.
+		time.Sleep(time.Millisecond)
 	}
+	p := &Packet{ic: d} // Weird bug when creating Packet before read loop. LLVM on AVR is buggy and ic will be nil afterwards.
 	// Set the read pointer to the start of the next packet
 	d.write16(ERDPTL, d.nextPacketPtr)
 	p.cursor = d.nextPacketPtr // Packet reader
 
-	d.readBuffer(d.dummy[:])
-	d.nextPacketPtr = uint16(d.dummy[0]) + uint16(d.dummy[1])<<8
+	d.readBuffer(d.buff[:])
+	d.nextPacketPtr = uint16(d.buff[0]) + uint16(d.buff[1])<<8
 	// read the packet length (see datasheet page 43)
-	plen := uint16(d.dummy[2]) + uint16(d.dummy[3])<<8 - 4 //remove the CRC count (minus 4)
+	plen := uint16(d.buff[2]) + uint16(d.buff[3])<<8 - 4 //remove the CRC count (minus 4)
 	p.end = p.cursor + plen
 	// read the receive status (see datasheet page 43)
-	rxstat := uint16(d.dummy[4]) + uint16(d.dummy[5])<<8
+	rxstat := uint16(d.buff[4]) + uint16(d.buff[5])<<8
 	// check CRC and symbol errors (see datasheet page 44, table 7-3):
 	// The ERXFCON.CRCEN is set by default. Normally we should not
 	// need to check this.

@@ -26,8 +26,8 @@ type Dev struct {
 	nextPacketPtr uint16
 	// tcursor contains
 	tcursor uint16
-	// dummy reads and for reading Receive Status Vector in NextPacket
-	dummy [6]byte
+	// buff is a small buffer for small SPI packets like read/write command bytes and reading the Receive status vector
+	buff [6]byte
 	// mac address
 	macaddr net.HardwareAddr
 	// SPI bus (requires chip select to be usable).
@@ -61,14 +61,15 @@ func (d *Dev) Init(macaddr []byte) error {
 	if d.GetRev() == 0 {
 		return ErrBadRev
 	}
+
 	return nil
 }
 
 // read len(data) bytes from buffer
 func (d *Dev) readBuffer(data []byte) {
 	d.enableCS()
-	cmd := [1]byte{READ_BUF_MEM}
-	d.bus.Tx(cmd[:], nil)
+	d.buff[0] = READ_BUF_MEM
+	d.bus.Tx(d.buff[:1], nil)
 	d.bus.Tx(nil, data)
 	d.disableCS()
 	dbp("read from ebuff", data)
@@ -77,8 +78,8 @@ func (d *Dev) readBuffer(data []byte) {
 // write data to buffer
 func (d *Dev) writeBuffer(data []byte) {
 	d.enableCS()
-	cmd := [1]byte{WRITE_BUF_MEM}
-	d.bus.Tx(append(cmd[:], data...), nil)
+	d.buff[0] = WRITE_BUF_MEM
+	d.bus.Tx(append(d.buff[:1], data...), nil)
 	d.disableCS()
 	dbp("write to ebuff", data)
 }
@@ -222,13 +223,13 @@ func (d *Dev) PacketRecieve(packet []byte) (plen uint16) {
 
 	// Set the read pointer to the start of the received packet
 	d.write16(ERDPTL, d.nextPacketPtr)
-	var fromBuff [2 + 2 + 2]byte
-	d.readBuffer(fromBuff[:])
-	d.nextPacketPtr = uint16(fromBuff[0]) + uint16(fromBuff[1])<<8
+
+	d.readBuffer(d.buff[:])
+	d.nextPacketPtr = uint16(d.buff[0]) + uint16(d.buff[1])<<8
 	// read the packet length (see datasheet page 43)
-	plen = uint16(fromBuff[2]) + uint16(fromBuff[3])<<8 - 4 //remove the CRC count (minus 4)
+	plen = uint16(d.buff[2]) + uint16(d.buff[3])<<8 - 4 //remove the CRC count (minus 4)
 	// read the receive status (see datasheet page 43)
-	rxstat = uint16(fromBuff[4]) + uint16(fromBuff[5])<<8
+	rxstat = uint16(d.buff[4]) + uint16(d.buff[5])<<8
 
 	// limit retrieve length
 	if plen > uint16(len(packet)) {

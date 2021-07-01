@@ -21,17 +21,14 @@ func (d *Dev) setBank(address uint8) {
 // readOp reads from a register defined in registers.go. It requires
 // the ENC28J60 Bank be set beforehand.
 func (d *Dev) readOp(op, address uint8) uint8 {
-	var read [2]byte
-
 	d.enableCS()
-	d.bus.Tx([]byte{op | (address & ADDR_MASK), 0}, read[:])
-	// dbp("RD addr, got:", []byte{address & ADDR_MASK}, read[1:])
+	d.bus.Tx([]byte{op | (address & ADDR_MASK), 0}, d.buff[:2])
 	// do dummy read if needed (for mac and mii, see datasheet page 29)
 	if address&SPRD_MASK != 0 {
-		d.bus.Tx(d.dummy[0:1], nil)
+		d.bus.Tx(d.buff[2:3], nil)
 	}
 	d.disableCS()
-	return read[1]
+	return d.buff[1]
 }
 
 // readOp writes to a register defined in registers.go. It requires
@@ -39,7 +36,6 @@ func (d *Dev) readOp(op, address uint8) uint8 {
 func (d *Dev) writeOp(op, address, data uint8) {
 	d.enableCS()
 	err := d.bus.Tx([]byte{op | (address & ADDR_MASK), data}, nil)
-	// dbp("WR addr, data:", []byte{address & ADDR_MASK}, []byte{data})
 	if err != nil {
 		dbp(err.Error(), []byte{op})
 	}

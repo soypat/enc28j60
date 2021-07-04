@@ -2,7 +2,7 @@ package main
 
 import (
 	"machine"
-	"unsafe"
+	"time"
 
 	"github.com/soypat/net"
 
@@ -33,49 +33,31 @@ func main() {
 	var spiCS = machine.D53
 	// Inline declarations so not used as RAM
 	var (
-		MAC = net.HardwareAddr{0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xFF}
-		// MyIP = net.IP{192, 168, 1, 5} //static setup is the only one available
+		MAC  = net.HardwareAddr{0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xFF}
+		MyIP = net.IP{192, 168, 1, 5} //static setup is the only one available
 	)
 
 	// 8MHz SPI clk for older than Rev 6 boards (See Rev. B4 Silicon Errata)
 	machine.SPI0.Configure(machine.SPIConfig{Frequency: 8e6})
 
 	e := enc28j60.New(spiCS, machine.SPI0)
-	enc28j60.SDB = true
+	// enc28j60.SDB = true
 	err := e.Init(MAC)
 	if err != nil {
 		println(err.Error())
 	}
-	if e == nil { // WITHOUT THIS NIL CHECK THE PROGRAM GC's e??
-		panic("nil device")
-	}
+	const okHeader = "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\nPragma: no-cache\r\n\r\n"
 	swtch.SDB = true
-	c := swtch.NewTCPConn(e, nil, MAC)
-	err = c.Decode()
-	if err != nil {
-		println(err.Error())
-	}
-	println(c.ARPv4.String())
-	err = c.SendResponse()
-	if err != nil {
-		println(err.Error())
-	}
-
-	err = c.Decode()
-	if err != nil {
-		println(err.Error())
-	}
-	println(c.TCP.String())
+	swtch.SDBTrace = true
+	// enc28j60.SDB = true
+	timeout := time.Second * 1
+	swtch.HTTPListenAndServe(e, MAC, MyIP, timeout, func(URL []byte) (response []byte) {
+		return []byte(okHeader + "Hello world!")
+	}, printNonNilErr)
 }
 
-func codeFromErrorUnsafeArduino(err error) uint8 {
+func printNonNilErr(err error) {
 	if err != nil {
-		type eface struct {
-			typ uintptr
-			val uint8
-		}
-		ptr := unsafe.Pointer(&err)
-		return (*eface)(ptr).val
+		println(err.Error())
 	}
-	return 0
 }

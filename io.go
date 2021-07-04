@@ -22,13 +22,13 @@ func (d *Dev) setBank(address uint8) {
 // the ENC28J60 Bank be set beforehand.
 func (d *Dev) readOp(op, address uint8) uint8 {
 	d.enableCS()
-	d.bus.Tx([]byte{op | (address & ADDR_MASK), 0}, d.buff[:2])
+	d.bus.Tx([]byte{op | (address & ADDR_MASK), 0}, d.buf[:2])
 	// do dummy read if needed (for mac and mii, see datasheet page 29)
 	if address&SPRD_MASK != 0 {
-		d.bus.Tx(d.buff[2:3], nil)
+		d.bus.Tx(d.buf[2:3], nil)
 	}
 	d.disableCS()
-	return d.buff[1]
+	return d.buf[1]
 }
 
 // readOp writes to a register defined in registers.go. It requires

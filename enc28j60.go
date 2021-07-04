@@ -26,8 +26,8 @@ type Dev struct {
 	nextPacketPtr uint16
 	// tcursor contains
 	tcursor uint16
-	// buff is a small buffer for small SPI packets like read/write command bytes and reading the Receive status vector
-	buff [6]byte
+	// buf is a small buffer for small SPI packets like read/write command bytes and reading the Receive status vector
+	buf [6]byte
 	// mac address
 	macaddr net.HardwareAddr
 	// SPI bus (requires chip select to be usable).
@@ -48,13 +48,6 @@ func (d *Dev) Init(macaddr []byte) error {
 	if len(macaddr) != 6 {
 		return ErrBadMac
 	}
-	// if buff == nil || len(buff) < 64 || len(buff) > 1500 {
-	// 	return ErrBufferSize
-	// }
-	if ETHERCARD_STASH {
-		// d.Stash = &Stash{}
-		// d.Stash.InitMap(SCRATCH_PAGE_NUM)
-	}
 	d.macaddr = macaddr
 	dbp("cfg call w/mac:", macaddr)
 	d.configure(macaddr)
@@ -68,8 +61,8 @@ func (d *Dev) Init(macaddr []byte) error {
 // read len(data) bytes from buffer
 func (d *Dev) readBuffer(data []byte) {
 	d.enableCS()
-	d.buff[0] = READ_BUF_MEM
-	d.bus.Tx(d.buff[:1], nil)
+	d.buf[0] = READ_BUF_MEM
+	d.bus.Tx(d.buf[:1], nil)
 	d.bus.Tx(nil, data)
 	d.disableCS()
 	dbp("read from ebuff", data)
@@ -78,8 +71,8 @@ func (d *Dev) readBuffer(data []byte) {
 // write data to buffer
 func (d *Dev) writeBuffer(data []byte) {
 	d.enableCS()
-	d.buff[0] = WRITE_BUF_MEM
-	d.bus.Tx(append(d.buff[:1], data...), nil)
+	d.buf[0] = WRITE_BUF_MEM
+	d.bus.Tx(append(d.buf[:1], data...), nil)
 	d.disableCS()
 	dbp("write to ebuff", data)
 }
@@ -147,8 +140,7 @@ func (d *Dev) configure(macaddr []byte) {
 	d.write(EPMM1, 0x30)
 	d.write(EPMCSL, 0xf9)
 	d.write(EPMCSH, 0xf7)
-	//
-	//
+
 	// do bank 2 stuff
 	// enable MAC receive frame (see 6.5 bullet 1)
 	d.write(MACON1, MACON1_MARXEN|MACON1_TXPAUS|MACON1_RXPAUS)
@@ -224,12 +216,12 @@ func (d *Dev) PacketRecieve(packet []byte) (plen uint16) {
 	// Set the read pointer to the start of the received packet
 	d.write16(ERDPTL, d.nextPacketPtr)
 
-	d.readBuffer(d.buff[:])
-	d.nextPacketPtr = uint16(d.buff[0]) + uint16(d.buff[1])<<8
+	d.readBuffer(d.buf[:])
+	d.nextPacketPtr = uint16(d.buf[0]) + uint16(d.buf[1])<<8
 	// read the packet length (see datasheet page 43)
-	plen = uint16(d.buff[2]) + uint16(d.buff[3])<<8 - 4 //remove the CRC count (minus 4)
+	plen = uint16(d.buf[2]) + uint16(d.buf[3])<<8 - 4 //remove the CRC count (minus 4)
 	// read the receive status (see datasheet page 43)
-	rxstat = uint16(d.buff[4]) + uint16(d.buff[5])<<8
+	rxstat = uint16(d.buf[4]) + uint16(d.buf[5])<<8
 
 	// limit retrieve length
 	if plen > uint16(len(packet)) {

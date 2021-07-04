@@ -24,13 +24,13 @@ func (d *Dev) NextPacket() (swtch.Reader, error) {
 	d.write16(ERDPTL, d.nextPacketPtr)
 	p.cursor = d.nextPacketPtr // Packet reader
 
-	d.readBuffer(d.buff[:])
-	d.nextPacketPtr = uint16(d.buff[0]) + uint16(d.buff[1])<<8
+	d.readBuffer(d.buf[:])
+	d.nextPacketPtr = uint16(d.buf[0]) + uint16(d.buf[1])<<8
 	// read the packet length (see datasheet page 43)
-	plen := uint16(d.buff[2]) + uint16(d.buff[3])<<8 - 4 //remove the CRC count (minus 4)
+	plen := uint16(d.buf[2]) + uint16(d.buf[3])<<8 - 4 //remove the CRC count (minus 4)
 	p.end = p.cursor + plen
 	// read the receive status (see datasheet page 43)
-	rxstat := uint16(d.buff[4]) + uint16(d.buff[5])<<8
+	rxstat := uint16(d.buf[4]) + uint16(d.buf[5])<<8
 	// check CRC and symbol errors (see datasheet page 44, table 7-3):
 	// The ERXFCON.CRCEN is set by default. Normally we should not
 	// need to check this.
@@ -39,6 +39,7 @@ func (d *Dev) NextPacket() (swtch.Reader, error) {
 	}
 	return p, err
 }
+
 func (p *Packet) Discard() error {
 	dbp("DiscardPacket")
 	if p.cursor != p.end {
@@ -47,6 +48,7 @@ func (p *Packet) Discard() error {
 	}
 	return nil
 }
+
 func (p *Packet) Read(buff []byte) (n uint16, err error) {
 	dbp("ReadPacket")
 	// total remaining packet length
@@ -61,10 +63,8 @@ func (p *Packet) Read(buff []byte) (n uint16, err error) {
 	if plen > uint16(len(buff)) {
 		plen = uint16(len(buff))
 	}
-	println(p.ic)
 	// copy the packet from the receive buffer
 	p.ic.readBuffer(buff[:plen])
-	dbp("ReadPacket2")
 	p.cursor += plen
 	// Move the RX read pointer to where we ended reading
 	p.ic.write16(ERXRDPTL, p.cursor)
